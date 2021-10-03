@@ -46,7 +46,7 @@ class Trainer(object):
         self.num_gpus = torch.cuda.device_count()
         self.use_cuda = self.num_gpus > 0
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
-
+        
         # self.model = AutoModelForMaskedLM.from_pretrained("klue/roberta-large")
         config = AutoConfig.from_pretrained("klue/roberta-large")
         self.model = AutoModelforKlueDp(config, args)
