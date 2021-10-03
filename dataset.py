@@ -189,13 +189,7 @@ class KlueDpDataset:
         cached_file_name = f'cached_DP_{mode}_features_{self.hparams.model_type}_{self.hparams.max_seq_length}'
 
         cached_features_file = os.path.join(data_dir, cached_file_name)
-        
-        if mode == 'train':
-            batch_size = self.hparams.train_batch_size 
-        elif mode == 'dev':
-            batch_size = self.hparams.train_batch_size
-        elif mode == 'test':
-            batch_size = self.hparams.train_batch_size
+
         
         if os.path.exists(cached_features_file):
             logger.info("Loading features from cached file %s", cached_features_file)
@@ -240,7 +234,7 @@ class KlueDpDataset:
             head_ids,
             dep_ids,
             pos_ids,
-        ), batch_size
+        )
 
     # def get_test_dataset(
     #     self, data_dir: str, data_filename: str = "klue-dp-v1_test.tsv"

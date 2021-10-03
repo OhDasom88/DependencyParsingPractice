@@ -265,10 +265,10 @@ def flatten_labels(labels):
 
 
 def resize_outputs(outputs, bpe_head_mask, bpe_tail_mask, max_word_length):
-    batch_size, input_size, hidden_size = outputs.size()
+    batch_size, input_size, hidden_size = outputs.size()#torch.Size([8, 128, 1024])
     word_outputs = torch.zeros(batch_size, max_word_length + 1, hidden_size * 2).to(
         outputs.device
-    )
+    )#torch.Size([8, 26, 2048])
     sent_len = list()
 
     for batch_id in range(batch_size):
@@ -283,7 +283,7 @@ def resize_outputs(outputs, bpe_head_mask, bpe_tail_mask, max_word_length):
             word_outputs[batch_id][i + 1] = torch.cat(
                 (outputs[batch_id][head], outputs[batch_id][tail])
             )
-        sent_len.append(i + 2)
+        sent_len.append(i + 2)# word 기준 길이
 
     return word_outputs, sent_len
 
