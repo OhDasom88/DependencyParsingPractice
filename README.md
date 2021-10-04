@@ -1,4 +1,4 @@
-# DependencyParsingPractice
+# Dependency Parsing Practice
 
 ## Reference
 - [KLEU_DP](https://arxiv.org/abs/2105.09680)
