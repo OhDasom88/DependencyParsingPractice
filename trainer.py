@@ -250,12 +250,14 @@ class Trainer(object):
             os.makedirs(self.args.model_dir)
         
         # 20211002?  https://tutorials.pytorch.kr/beginner/saving_loading_models.html#state-dict
-        best_model = torch.load(os.path.join(self.args.model_dir, 'checkpoint'))
+        best_model = torch.load(os.path.join(self.args.model_dir, 'checkpoint'))# GPU 126.00 MiB 정도 사용
         if best_model['loss'] > checkpoint['loss']:
             torch.save(checkpoint, '{}/checkpoint'.format(self.args.model_dir))
             self.tokenizer.save_pretrained(self.args.model_dir)
             torch.save(self.args, os.path.join(self.args.model_dir, 'training_args.bin'))
             self.config.save_pretrained(self.args.model_dir)
+            logger.info("model improved from {} to {} by {}".format(best_model['loss'], checkpoint['loss'], checkpoint['loss'] - best_model['loss']))
+        del best_model
 
         savepath = '{}/checkpoint_epoch_{}_step_{}'.format(self.args.model_dir, checkpoint['epoch'], checkpoint['step'])
         if not os.path.exists(savepath):
