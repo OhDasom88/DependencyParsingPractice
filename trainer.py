@@ -48,8 +48,8 @@ class Trainer(object):
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
         
         # self.model = AutoModelForMaskedLM.from_pretrained("klue/roberta-large")
-        config = AutoConfig.from_pretrained("klue/roberta-large")
-        self.model = AutoModelforKlueDp(config, args)
+        self.config = AutoConfig.from_pretrained("klue/roberta-large")
+        self.model = AutoModelforKlueDp(self.config, self.args)
         # self.model.load_state_dict("klue/roberta-large", map_location='cpu')
         #  = AutoModelforKlueDp.from_pretrained("klue/roberta-large", config=config, self.args)
 
@@ -110,7 +110,7 @@ class Trainer(object):
 
         train_iterator = trange(int(self.args.num_train_epochs), desc="Epoch")
 
-        for _ in train_iterator:
+        for epoch, _ in enumerate(train_iterator):
             epoch_iterator = tqdm(train_dataloader, desc="Iteration")
             for step, batch in enumerate(epoch_iterator):# batch:  input_ids, masks, ids, max_word_length
                 self.model.train()
@@ -137,12 +137,14 @@ class Trainer(object):
                     attention_mask,
                 )
 
+
+                head_ids[head_ids==-1] =0# masking 때문에 pad 부분이 0으로 변환됨
+                type_ids[type_ids==-1] =0# 
+
                 loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1))
                 loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1))
 
-
-                loss = loss_on_heads + loss_on_types
-
+                loss = loss_on_heads + loss_on_types 
                 # batch = tuple(t.to(self.device) for t in batch)  # GPU or CPU
                 # inputs = {'input_ids': batch[0],# len([i for i in batch[0][0] if i not in [1]]) == torch.tensor(batch[1][0]).sum()
                 #           'attention_mask': batch[1],# (attention_masks, bpe_head_masks, bpe_tail_masks, mask_e, mask_d)
@@ -174,7 +176,14 @@ class Trainer(object):
                         self.evaluate("test", global_step)
 
                     if self.args.save_steps > 0 and global_step % self.args.save_steps == 0:
-                        self.save_model()
+                        checkpoint = {
+                            'model_state_dict': self.model.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            'loss': loss,
+                            'epoch': epoch,
+                            'step': step,
+                        }
+                        self.save_model(checkpoint)
 
                 if 0 < self.args.max_steps < global_step:
                     epoch_iterator.close()
@@ -198,7 +207,8 @@ class Trainer(object):
 
         # load KLUE-DP-test
         kwargs = {"num_workers": self.num_gpus, "pin_memory": True} if self.use_cuda else {}
-        eval_dataloader = self.dataset.get_dataloader('dev', **kwargs)
+        # eval_dataloader = self.dataset.get_dataloader('dev', **kwargs)
+        eval_dataloader = self.dataset.get_dataloader('test', **kwargs)
 
         # Eval!
         logger.info("***** Running evaluation on %s dataset *****", mode)
@@ -218,45 +228,52 @@ class Trainer(object):
 
         for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
             input_ids, masks, ids, max_word_length = batch
-            input_ids = input_ids.to(self.device)
-            attention_mask, bpe_head_mask, bpe_tail_mask, mask_e, mask_d = (
-                mask.to(self.device) for mask in masks
+            input_ids = input_ids.to(self.device)# ([8, 128])
+            attention_mask, bpe_head_mask, bpe_tail_mask, mask_e, mask_d = ( 
+                mask.to(self.device) for mask in masks# [([8, 128]), ([8, 128]), ([8, 128]), ([8, 22]), ([8, 21])]
             )
-            head_ids, type_ids, pos_ids = (id.to(self.device) for id in ids)
+            head_ids, type_ids, pos_ids = (id.to(self.device) for id in ids)#[([8, 21]), ([8, 21]), ([8, 22])]
 
             batch_size, _ = head_ids.size()
             batch_index = torch.arange(0, batch_size).long()
-
-            out_arc, out_type = self.model(# torch.Size([8, 25, 26]), torch.Size([8, 25, 63])
-                bpe_head_mask,# torch.Size([8, 128])
-                bpe_tail_mask,# torch.Size([8, 128])
-                pos_ids,# torch.Size([8, 26])
-                head_ids,# torch.Size([8, 25])
-                max_word_length,# 25
-                mask_e,# torch.Size([8, 26])
-                mask_d,# torch.Size([8, 25])
-                batch_index,# torch.Size([8])
-                input_ids,# torch.Size([8, 128])
-                attention_mask,# torch.Size([8, 128])
+            # type id는 보내지 않음?
+            out_arc, out_type = self.model(# ([8, max_word_length, 26]), ([8, max_word_length, 63])
+                bpe_head_mask,# ([8, 128])
+                bpe_tail_mask,# ([8, 128])
+                pos_ids,# 0,1,2 ... 44 {label: i for i, label in enumerate(get_pos_labels())},  ([8, (max_word_length+1)])
+                head_ids,# -1: padding, 0: root?, DP 대상 문자열의 처음부터 1,2,3 .., ([8, max_word_length])
+                max_word_length,# batch 별로 다름 
+                mask_e,# ([8, (max_word_length+1)]) 아마 encoding layer의 첫번째 입력값으로 들어가는 CLS 때문일듯
+                mask_d,# ([8, max_word_length])
+                batch_index,# ([8])
+                input_ids,# ([8, 128])
+                attention_mask,# ([8, 128])
             )
 
-            heads = torch.argmax(out_arc, dim=2)#torch.Size([8, 25]) << torch.Size([8, 25, 26])
-            types = torch.argmax(out_type, dim=2)#torch.Size([8, 25]) << torch.Size([8, 25, 63])
+            heads = torch.argmax(out_arc, dim=2)#torch.Size([8, max_word_length]) << torch.Size([8, max_word_length, (max_word_length+1)])
+            types = torch.argmax(out_type, dim=2)#torch.Size([8, max_word_length]) << torch.Size([8, max_word_length, self.model.n_type_labels])
 
-            prediction = (heads, types)# (torch.Size([8, 25]), torch.Size([8, 25]))
+            prediction = (heads, types)# (torch.Size([8, max_word_length]), torch.Size([8, max_word_length]))
             predictions.append(prediction)
 
             # predictions are valid where labels exist
-            label = (head_ids, type_ids)# (torch.Size([8, 25]), torch.Size([8, 25]))
+            label = (head_ids, type_ids)# (torch.Size([8, max_word_length]), torch.Size([8, max_word_length]))
             labels.append(label)
 
+            # index = [i for i, label in enumerate(head_labels) if label == -1]
+            # head_preds = np.delete(head_preds, index)
+            # head_labels = np.delete(head_labels, index)
+            # index = [i for i, label in enumerate(type_labels) if label == -1]
+            # type_preds = np.delete(type_preds, index)
+            # type_labels = np.delete(type_labels, index)
+
+            head_ids[head_ids==-1] =0# masking 때문에 pad 부분이 0으로 변환됨
+            type_ids[type_ids==-1] =0# 
+
             loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1))
+            loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1))
             eval_loss += loss_on_heads.mean().item()
-            # type 안맞음
-            # loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1))
-            # eval_loss += loss_on_types.mean().item()
-            
-            
+            eval_loss += loss_on_types.mean().item()
             # eval_loss += tmp_eval_loss.mean().item()
 
             # # batch = tuple(t.to(self.device) for t in batch)
@@ -302,41 +319,45 @@ class Trainer(object):
             #         f.write("\n")
 
             # 20210924
-            with open(os.path.join(self.args.output_dir, "report_{}.txt".format(step)), "w", encoding="utf-8") as f:
-                f.write(utils.show_report(head_labels, head_preds))
-                f.write("\n")
-                f.write(utils.show_report(type_labels, type_preds))
-                f.write("\n")
+        #     with open(os.path.join(self.args.output_dir, "report_{}.txt".format(step)), "w", encoding="utf-8") as f:
+        #         f.write(utils.show_report(head_labels, head_preds))
+        #         f.write("\n")
+        #         f.write(utils.show_report(type_labels, type_preds))
+        #         f.write("\n")
 
-        result = utils.compute_metrics(head_labels, head_preds)
-        results.update(result)
-        result = utils.compute_metrics(type_labels, type_preds)
-        results.update(result)
+        # result = utils.compute_metrics(head_labels, head_preds)
+        # results.update(result)
+        # result = utils.compute_metrics(type_labels, type_preds)
+        # results.update(result)
 
-        logger.info("***** Eval results *****")
-        for key in sorted(results.keys()):
-            logger.info("  %s = %s", key, str(results[key]))
-        logger.info("\n" + utils.show_report(head_labels, head_preds))  # Get the report for each tag result
-        logger.info("\n" + utils.show_report(type_labels, type_preds))  # Get the report for each tag result
+        # logger.info("***** Eval results *****")
+        # for key in sorted(results.keys()):
+        #     logger.info("  %s = %s", key, str(results[key]))
+        # logger.info("\n" + utils.show_report(head_labels, head_preds))  # Get the report for each tag result
+        # logger.info("\n" + utils.show_report(type_labels, type_preds))  # Get the report for each tag result
 
         
         return results
 
-    def save_model(self):
+    def save_model(self, checkpoint):
         # Save model checkpoint (Overwrite)
         if not os.path.exists(self.args.model_dir):
             os.makedirs(self.args.model_dir)
-        model_to_save = self.model.module if hasattr(self.model, 'module') else self.model
-        model_to_save.save_pretrained(self.args.model_dir)
+
+        # model_to_save = self.model.module if hasattr(self.model, 'module') else self.model
+        # 20211002?  https://tutorials.pytorch.kr/beginner/saving_loading_models.html#state-dict
+        torch.save(checkpoint, '{}/checkpoint_epoch_{}_step_{}'.format(self.args.model_dir, checkpoint['epoch'], checkpoint['step']))
+
+        # model_to_save.save_pretrained(self.args.model_dir)
 
         #20211001
         self.tokenizer.save_pretrained(self.args.model_dir)
 
-        # 20211002?  https://tutorials.pytorch.kr/beginner/saving_loading_models.html#state-dict
-        torch.save(self.model.state_dict(), self.args.model_dir)
+        # torch.save(self.model.state_dict(), self.args.model_dir)
 
         # Save training arguments together with the trained model
         torch.save(self.args, os.path.join(self.args.model_dir, 'training_args.bin'))
+        torch.save(self.config, os.path.join(self.args.model_dir, 'config.json'))
         logger.info("Saving model checkpoint to %s", self.args.model_dir)
 
     # def load_model(self):
@@ -356,9 +377,10 @@ class Trainer(object):
         # tarpath = os.path.join(self.args.model_dir, model_name)
         # tar = tarfile.open(tarpath, "r:gz")
         # tar.extractall(path=self.args.model_dir)
-
-        # config = AutoConfig.from_pretrained(os.path.join(self.args.model_dir, "config.json"))
-        # model = AutoModelforKlueDp(config, args)
-        # model.load_state_dict(torch.load(os.path.join(self.args.model_dir, "dp-model.bin"), map_location='cpu'))
-        model = self.model# 학습 모델이 없음 임시
+        saved_arges = torch.load(os.path.join(self.args.model_dir, 'training_args.bin'))
+        checkpoint = torch.load(os.path.join(self.args.model_dir, 'checkpoint_epoch_0_step_127'))
+        self.config = AutoConfig.from_pretrained(os.path.join(self.args.model_dir, "config.json"))
+        model = AutoModelforKlueDp(self.config, saved_arges)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        # model = self.model# 학습 모델이 없음 임시
         return model

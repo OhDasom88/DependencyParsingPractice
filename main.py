@@ -50,15 +50,17 @@ if __name__ == '__main__':
     # parser.add_argument("--test_file", default="test.tsv", type=str, help="Test file")
     # parser.add_argument("--label_file", default="label.txt", type=str, help="Slot Label file")
 
-    # parser.add_argument("--write_pred", default=True, action="store_true", help="Write prediction during evaluation")
+    parser.add_argument("--write_pred", default=True, action="store_true", help="Write prediction during evaluation")
 
     # parser.add_argument("--model_type", default="kobert", type=str, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
     # parser.add_argument("--model_type", default="koelectra-base", type=str, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
     parser.add_argument("--model_type", default="roberta-large", type=str)
 
     parser.add_argument('--seed', type=int, default=42, help="random seed for initialization")
-    parser.add_argument("--train_batch_size", default=8, type=int, help="Batch size for training.")
-    parser.add_argument("--eval_batch_size", default=16, type=int, help="Batch size for evaluation.")
+    # parser.add_argument("--train_batch_size", default=8, type=int, help="Batch size for training.")
+    parser.add_argument("--train_batch_size", default=4, type=int, help="Batch size for training.")
+    # parser.add_argument("--eval_batch_size", default=16, type=int, help="Batch size for evaluation.")
+    parser.add_argument("--eval_batch_size", default=4, type=int, help="Batch size for evaluation.")
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--num_train_epochs", default=3.0, type=float, help="Total number of training epochs to perform.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
@@ -67,13 +69,14 @@ if __name__ == '__main__':
     parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
     
-    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
+    # parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
+    parser.add_argument("--max_steps", default=16, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
+    parser.add_argument("--warmup_steps", default=8, type=int, help="Linear warmup over warmup_steps.")
 
     parser.add_argument('--logging_steps', type=int, default=32, help="Log every X updates steps.")
-    parser.add_argument('--save_steps', type=int, default=32, help="Save checkpoint every X updates steps.")
+    parser.add_argument('--save_steps', type=int, default=16, help="Save checkpoint every X updates steps.")
 
-    parser.add_argument("--do_train", default=False, action="store_true", help="Whether to run training.")
+    parser.add_argument("--do_train", default=True, action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", default=True, action="store_true", help="Whether to run eval on the test set.")
     parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
 

@@ -268,20 +268,20 @@ def resize_outputs(outputs, bpe_head_mask, bpe_tail_mask, max_word_length):
     batch_size, input_size, hidden_size = outputs.size()#torch.Size([8, 128, 1024])
     word_outputs = torch.zeros(batch_size, max_word_length + 1, hidden_size * 2).to(
         outputs.device
-    )#torch.Size([8, 26, 2048])
+    )#torch.Size([8, max_word_length, 2048])
     sent_len = list()
 
     for batch_id in range(batch_size):
-        head_ids = [i for i, token in enumerate(bpe_head_mask[batch_id]) if token == 1]
-        tail_ids = [i for i, token in enumerate(bpe_tail_mask[batch_id]) if token == 1]
+        head_ids = [i for i, token in enumerate(bpe_head_mask[batch_id]) if token == 1]# head 위치 정보: subword 기준
+        tail_ids = [i for i, token in enumerate(bpe_tail_mask[batch_id]) if token == 1]# tail 위치 정보: subword 기준
         assert len(head_ids) == len(tail_ids)
-
-        word_outputs[batch_id][0] = torch.cat(
-            (outputs[batch_id][0], outputs[batch_id][0])
+        # outputs[batch_id].shape == torch.Size([128, 1024])
+        word_outputs[batch_id][0] = torch.cat(# outputs[batch_id][0]은 첫 token인 [CLS]에 대응
+            (outputs[batch_id][0], outputs[batch_id][0])# [torch.Size([1024]), torch.Size([1024])]
         )  # replace root with [CLS]
         for i, (head, tail) in enumerate(zip(head_ids, tail_ids)):
-            word_outputs[batch_id][i + 1] = torch.cat(
-                (outputs[batch_id][head], outputs[batch_id][tail])
+            word_outputs[batch_id][i + 1] = torch.cat(# concatenate the first and last subword token representations of each word, to form word vector representations.
+                (outputs[batch_id][head], outputs[batch_id][tail])# 
             )
         sent_len.append(i + 2)# word 기준 길이
 

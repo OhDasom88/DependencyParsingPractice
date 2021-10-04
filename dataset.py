@@ -98,7 +98,7 @@ class KlueDpDataset:
             # if sentence index is changed or end of the loop
             if SENT_ID != example.sent_id or i == len(examples) - 1:
                 SENT_ID = example.sent_id
-                encoded = tokenizer.encode_plus(
+                encoded = tokenizer.encode_plus(# tokenized into subword level
                     " ".join(token_list),
                     None,
                     add_special_tokens=True,
@@ -114,7 +114,7 @@ class KlueDpDataset:
                 head_ids = [-1]# head_mapping 
                 dep_ids = [-1]# DEPREL mapping, -1에 해당하는 id 값이 없음(0-37)
                 pos_ids = [-1]  # --> CLS token # POS mapping, -1에 해당하는 id 값이 없음(0-45)
-                for token, head, dep, pos in zip(# 단어(아마 split(' '))에 가까운 문자열을 subword(with tokenizer)로 mapping
+                for token, head, dep, pos in zip(# 단어(아마 split(' '))에 가까운 문자열을 subword(with tokenizer)기준 정보로 mapping
                     token_list, head_list, dep_list, pos_list
                 ):
                     bpe_len = len(tokenizer.tokenize(token))# DP 단위내 subword의 위치 정보 반영에 사용
@@ -123,11 +123,11 @@ class KlueDpDataset:
                     bpe_head_mask.extend(head_token_mask)# head subwords masking 정보 축적
                     bpe_tail_mask.extend(tail_token_mask)# head subwords masking 정보 축적
 
-                    head_mask = [head] + [-1] * (bpe_len - 1)
+                    head_mask = [head] + [-1] * (bpe_len - 1)# 단어의 head 정보를 첫번째 subword의 head 정보에 mapping, 나머지는 -1
                     head_ids.extend(head_mask)# reference 정보 축적(head), parsing 단위별(ex 문장)
-                    dep_mask = [dep_label_map[dep]] + [-1] * (bpe_len - 1)# dependecy label mapping
+                    dep_mask = [dep_label_map[dep]] + [-1] * (bpe_len - 1)# dependecy label mapping, 단어의 deprel 정보를 첫번째 subword의 deprel 정보에 mapping, 나머지는 -1
                     dep_ids.extend(dep_mask)# DEPREL 정보 축적, parsing 단위별(ex 문장)
-                    pos_mask = [pos_label_map[pos]] + [-1] * (bpe_len - 1)# POS label mapping
+                    pos_mask = [pos_label_map[pos]] + [-1] * (bpe_len - 1)# POS label mapping, 단어의 pos 정보를 첫번째 subword의 pos 정보에 mapping, 나머지는 -1
                     pos_ids.extend(pos_mask)# POS 정보 축적, parsing 단위별(ex 문장)
                 # DP 대상 + subword 위치 정보가 반영됨 + SEP token을 위한 masking 처리일것 같음
                 # len([i for i in ids if i not in [1]]) == torch.tensor(mask).sum() 
@@ -143,7 +143,7 @@ class KlueDpDataset:
                     dep_ids = dep_ids[:max_length]
                     pos_ids = pos_ids[:max_length]# end token 없음?
 
-                else:# 왜 padding index가 같지 않지?
+                else:
                     bpe_head_mask.extend(
                         [0] * (max_length - len(bpe_head_mask))
                     )  # padding by max_len
@@ -212,19 +212,19 @@ class KlueDpDataset:
             logger.info("Saving features into cached file %s", cached_features_file)
             torch.save(features, cached_features_file)
 
-        input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-        attention_mask = torch.tensor(
+        input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)# torch.Size([2000, 128])
+        attention_mask = torch.tensor(# (2000,128)
             [f.attention_mask for f in features], dtype=torch.long
         )
-        bpe_head_mask = torch.tensor(
+        bpe_head_mask = torch.tensor(# (2000,128)
             [f.bpe_head_mask for f in features], dtype=torch.long
         )
-        bpe_tail_mask = torch.tensor(
+        bpe_tail_mask = torch.tensor(# (2000,128)
             [f.bpe_tail_mask for f in features], dtype=torch.long
         )
-        head_ids = torch.tensor([f.head_ids for f in features], dtype=torch.long)
-        dep_ids = torch.tensor([f.dep_ids for f in features], dtype=torch.long)
-        pos_ids = torch.tensor([f.pos_ids for f in features], dtype=torch.long)
+        head_ids = torch.tensor([f.head_ids for f in features], dtype=torch.long)# (2000,128)
+        dep_ids = torch.tensor([f.dep_ids for f in features], dtype=torch.long)# (2000,128)
+        pos_ids = torch.tensor([f.pos_ids for f in features], dtype=torch.long)# (2000,128)
 
         return TensorDataset(
             input_ids,
