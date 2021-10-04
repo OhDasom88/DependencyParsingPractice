@@ -20,28 +20,13 @@ class Trainer(object):
     # def __init__(self, args, train_dataset=None, dev_dataset=None, test_dataset=None, tokenizer = None):
     def __init__(self, args, dataset,  tokenizer = None):
         self.args = args
-        # self.train_dataset = train_dataset
-        # self.dev_dataset = dev_dataset
-        # self.test_dataset = test_dataset
         self.dataset = dataset
 
         self.tokenizer = tokenizer
 
-        # self.label_lst = get_labels(args)
-        # self.num_labels = len(self.label_lst)
-        
-        
         # Use cross entropy ignore index as padding label id so that only real label ids contribute to the loss later
-        self.pad_token_label_id = torch.nn.CrossEntropyLoss().ignore_index# -100 여기는 -1로 되어 있는듯
-
-        # self.config_class, self.model_class, _ = MODEL_CLASSES[args.model_type]
-
-        # self.config = self.config_class.from_pretrained(args.model_name_or_path,
-        #                                                 num_labels=self.num_labels,
-        #                                                 finetuning_task=args.task,
-        #                                                 id2label={str(i): label for i, label in enumerate(self.label_lst)},
-        #                                                 label2id={label: i for i, label in enumerate(self.label_lst)})
-        # self.model = self.model_class.from_pretrained(args.model_name_or_path, config=self.config)
+        # -100 여기는 -1로 되어 있는듯,  
+        # self.pad_token_label_id = torch.nn.CrossEntropyLoss().ignore_index
 
         # device setup
         self.num_gpus = torch.cuda.device_count()
@@ -122,7 +107,7 @@ class Trainer(object):
                     attention_mask,
                 )
 
-
+                # , we minimize the cross-entropy loss to fine-tune the entire model
                 loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1), ignore_index=-1)
                 loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1), ignore_index=-1)
 
@@ -221,7 +206,7 @@ class Trainer(object):
             label = (head_ids, type_ids)# (torch.Size([8, max_word_length]), torch.Size([8, max_word_length]))
             labels.append(label)
 
-
+            
             loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1), ignore_index=-1)
             loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1), ignore_index=-1)
             tmp_eval_loss = loss_on_heads+loss_on_types 
@@ -246,12 +231,6 @@ class Trainer(object):
                 f.write("HEAD(pred, real) \t DEPREL (pred, real) \n")
                 for h, t, hl,tl in zip(head_preds, type_preds, head_labels, type_labels):
                     f.write(" ".join([str(h),str(hl)])+'\t'+" ".join([str(dp_labels[t]), str(dp_labels[tl])]) + "\n")
-
-            # with open(os.path.join(self.args.pred_dir, "pred_{}.txt".format(step)), "w", encoding="utf-8") as f:
-            #     for text, true_label, pred_label in zip(self.test_texts, out_label_list, preds_list):
-            #         for t, tl, pl in zip(text, true_label, pred_label):
-            #             f.write("{}\t{}\t{}\n".format(t, tl, pl))
-            #         f.write("\n")
 
             # # 20210924
             scores = utils.compute_metrics({'HEAD':(head_labels, head_preds),'DEPREL':(type_labels, type_preds)})
