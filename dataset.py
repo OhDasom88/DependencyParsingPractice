@@ -11,6 +11,8 @@ from utils import (KlueDpInputExample, KlueDpInputFeatures, get_dp_labels,
 import logging
 logger = logging.getLogger(__name__)
 from tqdm import tqdm
+
+
 class KlueDpDataset:
     def __init__(self, args, tokenizer):
         self.hparams = args
@@ -54,6 +56,7 @@ class KlueDpDataset:
                     )
         return examples
 
+
     def _convert_features(
         self, examples: List[KlueDpInputExample]
     ) -> List[KlueDpInputFeatures]:
@@ -65,6 +68,7 @@ class KlueDpDataset:
             pos_label_list=get_pos_labels(),
         )
 
+
     def convert_examples_to_features(
         self,
         examples: List[KlueDpInputExample],
@@ -73,6 +77,7 @@ class KlueDpDataset:
         pos_label_list=None,
         dep_label_list=None,
     ):
+
         if max_length is None:
             max_length = tokenizer.max_len#AttributeError: 'BertTokenizerFast' object has no attribute 'max_len'
 
@@ -111,6 +116,8 @@ class KlueDpDataset:
                 # CLS token을 위한 padding 처리일것 같음
                 bpe_head_mask = [0]# 각 DP 분석 단위(문장)별 subwords masking 정보(head)
                 bpe_tail_mask = [0]# "상동" (tail): head와 tail은 word가 아니라 subword(tokenized )의 위치에 대응
+
+                
                 head_ids = [-1]# head_mapping 
                 dep_ids = [-1]# DEPREL mapping, -1에 해당하는 id 값이 없음(0-37)
                 pos_ids = [-1]  # --> CLS token # POS mapping, -1에 해당하는 id 값이 없음(0-45)
@@ -129,6 +136,7 @@ class KlueDpDataset:
                     dep_ids.extend(dep_mask)# DEPREL 정보 축적, parsing 단위별(ex 문장)
                     pos_mask = [pos_label_map[pos]] + [-1] * (bpe_len - 1)# POS label mapping, 단어의 pos 정보를 첫번째 subword의 pos 정보에 mapping, 나머지는 -1
                     pos_ids.extend(pos_mask)# POS 정보 축적, parsing 단위별(ex 문장)
+
                 # DP 대상 + subword 위치 정보가 반영됨 + SEP token을 위한 masking 처리일것 같음
                 # len([i for i in ids if i not in [1]]) == torch.tensor(mask).sum() 
                 bpe_head_mask.append(0)#                == len(bpe_head_mask)
@@ -136,6 +144,8 @@ class KlueDpDataset:
                 head_ids.append(-1)#                    == len(head_ids)
                 dep_ids.append(-1)#                     == len(dep_ids)
                 pos_ids.append(-1)  # END token         == len(pos_ids)
+
+
                 if len(bpe_head_mask) > max_length:
                     bpe_head_mask = bpe_head_mask[:max_length]
                     bpe_tail_mask = bpe_tail_mask[:max_length]
@@ -157,6 +167,7 @@ class KlueDpDataset:
                         [-1] * (max_length - len(dep_ids))
                     )  # padding by max_len
                     pos_ids.extend([-1] * (max_length - len(pos_ids)))
+
 
                 feature = KlueDpInputFeatures(
                     guid=example.guid,

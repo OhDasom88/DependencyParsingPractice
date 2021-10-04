@@ -4,8 +4,10 @@ import torch
 ## 20211002
 import logging
 import random
-from seqeval.metrics import precision_score, recall_score, f1_score, classification_report
 from sklearn.metrics import f1_score, recall_score, precision_score
+
+import tarfile
+
 
 class KlueDpInputExample:
     """
@@ -325,3 +327,10 @@ def compute_metrics(data):
             }            
         })
     return scores
+
+
+def tardir(path, tar_name):
+    with tarfile.open(tar_name, "w") as tar_handle:
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                tar_handle.add(os.path.join(root, file))
