@@ -5,7 +5,7 @@ import torch
 import logging
 import random
 from seqeval.metrics import precision_score, recall_score, f1_score, classification_report
-
+from sklearn.metrics import f1_score, recall_score, precision_score
 
 class KlueDpInputExample:
     """
@@ -313,24 +313,15 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 
-def compute_metrics(labels, preds):
-    assert len(preds) == len(labels)
-    return f1_pre_rec(labels, preds)
-
-
-def f1_pre_rec(labels, preds):
-    # return {
-    #     "precision": precision_score(labels, preds, suffix=True),
-    #     "recall": recall_score(labels, preds, suffix=True),
-    #     "f1": f1_score(labels, preds, suffix=True)
-    # }
-    return {
-        "precision": precision_score(labels, preds, suffix=False),
-        "recall": recall_score(labels, preds, suffix=False),
-        "f1": f1_score(labels, preds, suffix=False)
-    }
-
-
-def show_report(labels, preds):
-    # return classification_report(labels, preds, suffix=True)
-    return classification_report(labels, preds, suffix=False)
+def compute_metrics(data):
+    scores = {}
+    for k, (preds, labels) in data.items():
+        assert len(preds) == len(labels)
+        scores.update({
+            k : {
+                "precision": precision_score(labels, preds, average='macro'),
+                "recall": recall_score(labels, preds, average='macro'),
+                "f1": f1_score(labels, preds, average='macro')
+            }            
+        })
+    return scores
