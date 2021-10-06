@@ -13,6 +13,8 @@ from model import AutoModelforKlueDp
 import utils
 import json
 import tarfile
+import torch.nn.functional as F
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,6 +95,9 @@ class Trainer(object):
 
                 batch_size, _ = head_ids.size()
                 batch_index = torch.arange(0, batch_size).long()
+                head_index = (
+                    torch.arange(0, max_word_length).view(max_word_length, 1).expand(max_word_length, batch_size).long()
+                )
 
                 out_arc, out_type = self.model(# loss 반환 x
                     bpe_head_mask,
@@ -107,11 +112,36 @@ class Trainer(object):
                     attention_mask,
                 )
 
-                # , we minimize the cross-entropy loss to fine-tune the entire model
-                loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1), ignore_index=-1)
-                loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1), ignore_index=-1)
+                # # , we minimize the cross-entropy loss to fine-tune the entire model
+                # loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1), ignore_index=-1)
+                # loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1), ignore_index=-1)
 
-                loss = loss_on_heads + loss_on_types 
+                # loss = loss_on_heads + loss_on_types 
+
+                # compute loss
+                minus_inf = -1e8
+                minus_mask_d = (1 - mask_d) * minus_inf
+                minus_mask_e = (1 - mask_e) * minus_inf
+                out_arc = out_arc + minus_mask_d.unsqueeze(2) + minus_mask_e.unsqueeze(1)
+
+                loss_arc = F.log_softmax(out_arc, dim=2)
+                loss_type = F.log_softmax(out_type, dim=2)
+
+                loss_arc = loss_arc * mask_d.unsqueeze(2) * mask_e.unsqueeze(1)
+                loss_type = loss_type * mask_d.unsqueeze(2)
+                num = mask_d.sum()
+
+                loss_arc = loss_arc[batch_index, head_index, head_ids.data.t()].transpose(0, 1)
+                loss_type = loss_type[batch_index, head_index, type_ids.data.t()].transpose(0, 1)
+                loss_arc = -loss_arc.sum() / num
+                loss_type = -loss_type.sum() / num
+                loss = loss_arc + loss_type
+                
+                # logger.info("train/loss_arc", loss_arc.detach().cpu().item())
+                # logger.info("train/loss_type", loss_type.detach().cpu().item())
+                # logger.info("train/loss", loss.detach().cpu().item())
+
+
 
                 if self.args.gradient_accumulation_steps > 1:
                     loss = loss / self.args.gradient_accumulation_steps
@@ -182,6 +212,11 @@ class Trainer(object):
 
             batch_size, _ = head_ids.size()
             batch_index = torch.arange(0, batch_size).long()
+            
+            head_index = (
+                torch.arange(0, max_word_length).view(max_word_length, 1).expand(max_word_length, batch_size).long()
+            )
+
             # type id는 보내지 않음?
             out_arc, out_type = self.model(# ([8, max_word_length, 26]), ([8, max_word_length, 63])
                 bpe_head_mask,# ([8, 128])
@@ -207,9 +242,27 @@ class Trainer(object):
             labels.append(label)
 
             
-            loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1), ignore_index=-1)
-            loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1), ignore_index=-1)
-            tmp_eval_loss = loss_on_heads+loss_on_types 
+            # loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1), ignore_index=-1)
+            # loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1), ignore_index=-1)
+            # tmp_eval_loss = loss_on_heads+loss_on_types 
+            # eval_loss += tmp_eval_loss.item()
+
+
+            # compute loss
+            minus_inf = -1e8
+            minus_mask_d = (1 - mask_d) * minus_inf
+            minus_mask_e = (1 - mask_e) * minus_inf
+            out_arc = out_arc + minus_mask_d.unsqueeze(2) + minus_mask_e.unsqueeze(1)
+            loss_arc = F.log_softmax(out_arc, dim=2)
+            loss_type = F.log_softmax(out_type, dim=2)
+            loss_arc = loss_arc * mask_d.unsqueeze(2) * mask_e.unsqueeze(1)
+            loss_type = loss_type * mask_d.unsqueeze(2)
+            num = mask_d.sum()
+            loss_arc = loss_arc[batch_index, head_index, head_ids.data.t()].transpose(0, 1)
+            loss_type = loss_type[batch_index, head_index, type_ids.data.t()].transpose(0, 1)
+            loss_arc = -loss_arc.sum() / num
+            loss_type = -loss_type.sum() / num
+            tmp_eval_loss = loss_arc + loss_type
             eval_loss += tmp_eval_loss.item()
 
             nb_eval_steps += 1
