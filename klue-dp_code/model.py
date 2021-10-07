@@ -21,11 +21,8 @@ class AutoModelforKlueDp(nn.Module):
         self.type_space = hparams.type_space
 
         self.n_pos_labels = len(utils.get_pos_labels())
-        # self.n_type_labels = len(utils.get_dp_labels())
-        self.n_type_labels = (
-            # 63  # FIXME : Among all 63 types, only some of them (38) exist in klue-dp
-            38  # FIXME : Among all 63 types, only some of them (38) exist in klue-dp
-        )
+        self.n_type_labels = len(utils.get_dp_labels())
+
         if args.no_pos:
             self.pos_embedding = None
         else:
@@ -131,6 +128,11 @@ class AutoModelforKlueDp(nn.Module):
         out_arc = self.attention(arc_h, arc_c, mask_d=mask_d, mask_e=mask_e).squeeze(
             dim=1
         )
+
+        # use predicted head_ids when validation step
+        if head_ids is None:
+            head_ids = torch.argmax(out_arc, dim=2)
+
         type_c = type_c[batch_index, head_ids.data.t()].transpose(0, 1).contiguous()
         out_type = self.bilinear(type_h, type_c)
 

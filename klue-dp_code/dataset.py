@@ -48,13 +48,13 @@ class KlueDpDataset:
                                 )
                             )
 
-                # else:
-                    # token_list = []
-                    # token_list = (# sent_id, index	공백단위 split	LEMMA(형태소단위)	POS(형태소정보)	HEAD(참조 index)	DEPREL(관계정보)
-                    #     [sent_id]
-                    #     + [token.replace("\n", "") for token in line.split("\t")]
-                    #     + ["-", "-"]
-                    # )
+                else:
+                    token_list = []
+                    token_list = (# sent_id, index	공백단위 split	LEMMA(형태소단위)	POS(형태소정보)	HEAD(참조 index)	DEPREL(관계정보)
+                        [sent_id]
+                        + [token.replace("\n", "") for token in line.split("\t")]
+                        + ["-", "-"]
+                    )
                     # examples.append(
                     #     KlueDpInputExample(
                     #         guid=guid,# ex klue-dp-v1_dev_00001_wikitre
@@ -139,10 +139,10 @@ class KlueDpDataset:
                     bpe_head_mask.extend(head_token_mask)
                     bpe_tail_mask.extend(tail_token_mask)
 
-                    head_mask = [head] + [-1] * (bpe_len - 1)
+                    head_mask = [head] + [-1] * (bpe_len - 1)# 예측해야 하는 값
                     head_ids.extend(head_mask)
-                    # dep_mask = [dep_label_map[dep]] + [-1] * (bpe_len - 1)# 각 단어당 하나
-                    dep_mask = [-1] * (bpe_len)# 각 단어당 하나
+                    dep_mask = [dep_label_map[dep]] + [-1] * (bpe_len - 1)# 각 단어당 하나
+                    # dep_mask = [-1] * (bpe_len)# 각 단어당 하나# 예측해야 하는 값
                     dep_ids.extend(dep_mask)
                     # pos_mask = [pos_label_map[pos]] + [-1] * (bpe_len - 1)
                     pos_mask = [len(pos_label_map)] + [-1] * (bpe_len - 1)# len(pos_label_map) == pos_padding_idx

@@ -69,7 +69,10 @@ def inference(data_dir, model_dir, output_dir, args):
             mask.to(device) for mask in masks
         )
         head_ids, type_ids, pos_ids = (id.to(device) for id in ids)
-
+        #type id는 model로 안넘어감
+        #head id는 넘어가지만 모델 학습이나 output에 영향이 없도록 해야함
+        #bilinear 모델 실행에 앞서 training하는 경우가 아닌경우 
+        # attention output의 결과물로 head_id값을 대체
         batch_size, _ = head_ids.size()
         batch_index = torch.arange(0, batch_size).long()
 
@@ -77,7 +80,8 @@ def inference(data_dir, model_dir, output_dir, args):
             bpe_head_mask,
             bpe_tail_mask,
             pos_ids,
-            head_ids,
+            # head_ids,
+            None,
             max_word_length,
             mask_e,
             mask_d,
@@ -111,15 +115,15 @@ if __name__ == "__main__":
 
     # Container environment
     parser.add_argument(
-        "--data_dir", type=str, default=os.environ.get("SM_CHANNEL_EVAL", "/home/tutor/DependencyParsingPractice/klue-dp_code/data")
+        "--data_dir", type=str, default=os.environ.get("SM_CHANNEL_EVAL", "/home/dasomoh88/DependencyParsingPractice/klue-dp_code/data")
     )
     parser.add_argument(
-        "--model_dir", type=str, default="/home/tutor/DependencyParsingPractice/klue-dp_code/model"
+        "--model_dir", type=str, default="/home/dasomoh88/DependencyParsingPractice/klue-dp_code/model"
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=os.environ.get("SM_OUTPUT_DATA_DIR", "/home/tutor/DependencyParsingPractice/klue-dp_code/output"),
+        default=os.environ.get("SM_OUTPUT_DATA_DIR", "/home/dasomoh88/DependencyParsingPractice/klue-dp_code/output"),
     )
 
     # inference arguments
