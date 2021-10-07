@@ -9,6 +9,7 @@ import os
 import tarfile
 
 import torch
+from tqdm import utils
 from dataloader import KlueDpDataLoader
 from model import AutoModelforKlueDp
 from transformers import AutoConfig, AutoTokenizer
@@ -20,6 +21,7 @@ from utils import get_dp_labels, get_pos_labels
 import re
 from konlpy.tag import Mecab
 m = Mecab()
+import numpy as np
 
 KLUE_DP_OUTPUT = "output.csv"  # the name of output file should be output.csv
 
@@ -93,14 +95,23 @@ def inference(data_dir, model_dir, output_dir, args):
         heads = torch.argmax(out_arc, dim=2)
         types = torch.argmax(out_type, dim=2)
         
+        heads_t = heads.detach().cpu().numpy()
+        types_t = types.detach().cpu().numpy()
+
+        for i, each_input in enumerate(input_ids.detach().cpu().numpy()):
+            print(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(each_input, skip_special_tokens=True)))
+            index = [i for i, label in enumerate(head_ids[i]) if label == -1]
+            print(np.delete(np.array(heads_t[i]),index))
+            print(np.delete(np.array(types_t[i]),index))
+            print([get_dp_labels()[k] for k in np.delete(np.array(types_t[i]),index)])
+
+
         prediction = (heads, types)
         predictions.append(prediction)
-
         # predictions are valid where labels exist
         label = (head_ids, type_ids)
         labels.append(label)
-
-        tokens.append([tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(each_input, skip_special_tokens=True)) for each_input in input_ids.detach().cpu().numpy()])
+        
 
     head_preds, type_preds, _, _ = flatten_prediction_and_labels(predictions, labels)
 
