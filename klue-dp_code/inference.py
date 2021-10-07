@@ -13,16 +13,23 @@ from dataloader import KlueDpDataLoader
 from model import AutoModelforKlueDp
 from transformers import AutoConfig, AutoTokenizer
 from utils import flatten_prediction_and_labels
+from utils import get_dp_labels, get_pos_labels
+
+
+# 20211008
+import re
+from konlpy.tag import Mecab
+m = Mecab()
 
 KLUE_DP_OUTPUT = "output.csv"  # the name of output file should be output.csv
 
 
 def load_model(model_dir, args):
     # extract tar.gz
-    model_name = args.model_tar_file
-    tarpath = os.path.join(model_dir, model_name)
-    tar = tarfile.open(tarpath, "r:gz")
-    tar.extractall(path=model_dir)
+    # model_name = args.model_tar_file
+    # tarpath = os.path.join(model_dir, model_name)
+    # tar = tarfile.open(tarpath, "r:gz")
+    # tar.extractall(path=model_dir)
 
     config = AutoConfig.from_pretrained(os.path.join(model_dir, "config.json"))
     model = AutoModelforKlueDp(config, args)
@@ -34,7 +41,8 @@ def load_model(model_dir, args):
 def inference(data_dir, model_dir, output_dir, args):
     # device setup
     num_gpus = torch.cuda.device_count()
-    use_cuda = num_gpus > 0
+    # use_cuda = num_gpus > 0
+    use_cuda = False
     device = torch.device("cuda" if use_cuda else "cpu")
 
     # load model
@@ -46,14 +54,14 @@ def inference(data_dir, model_dir, output_dir, args):
     kwargs = {"num_workers": num_gpus, "pin_memory": True} if use_cuda else {}
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     klue_dp_dataset = KlueDpDataLoader(args, tokenizer, data_dir)
-    # klue_dp_test_loader = klue_dp_dataset.get_test_dataloader(
-    #     args.test_filename, **kwargs
-    # )
-    klue_dp_test_loader = klue_dp_dataset.get_dataloader('train',  **kwargs)
+    klue_dp_test_loader = klue_dp_dataset.get_test_dataloader(
+        args.test_filename, **kwargs
+    )
 
     # inference
     predictions = []
     labels = []
+    tokens = []
     for i, batch in enumerate(klue_dp_test_loader):
         input_ids, masks, ids, max_word_length = batch
         input_ids = input_ids.to(device)
@@ -80,13 +88,15 @@ def inference(data_dir, model_dir, output_dir, args):
 
         heads = torch.argmax(out_arc, dim=2)
         types = torch.argmax(out_type, dim=2)
-
+        
         prediction = (heads, types)
         predictions.append(prediction)
 
         # predictions are valid where labels exist
         label = (head_ids, type_ids)
         labels.append(label)
+
+        tokens.append([tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(each_input, skip_special_tokens=True)) for each_input in input_ids.detach().cpu().numpy()])
 
     head_preds, type_preds, _, _ = flatten_prediction_and_labels(predictions, labels)
 
@@ -101,15 +111,15 @@ if __name__ == "__main__":
 
     # Container environment
     parser.add_argument(
-        "--data_dir", type=str, default=os.environ.get("SM_CHANNEL_EVAL", "/data")
+        "--data_dir", type=str, default=os.environ.get("SM_CHANNEL_EVAL", "/home/tutor/DependencyParsingPractice/klue-dp_code/data")
     )
     parser.add_argument(
-        "--model_dir", type=str, default="/home/tutor/DependencyParsingPractice/model"
+        "--model_dir", type=str, default="/home/tutor/DependencyParsingPractice/klue-dp_code/model"
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=os.environ.get("SM_OUTPUT_DATA_DIR", "/output"),
+        default=os.environ.get("SM_OUTPUT_DATA_DIR", "/home/tutor/DependencyParsingPractice/klue-dp_code/output"),
     )
 
     # inference arguments

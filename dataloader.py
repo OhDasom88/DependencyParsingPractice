@@ -38,9 +38,9 @@ class KlueDpDataLoader(object):
             bpe_tail_masks.append(bpe_tail_mask)
         # 2. build inputs : packing tensors
         input_ids = torch.stack(input_ids)# torch.Size([ , max_seq_length])
-        attention_masks = torch.stack(attention_masks)
-        bpe_head_masks = torch.stack(bpe_head_masks)
-        bpe_tail_masks = torch.stack(bpe_tail_masks)
+        attention_masks = torch.stack(attention_masks)# [len([i for i in row if i !=0]) for row in attention_masks ] == [len([i for i in row if i !=1]) for row in input_ids]
+        bpe_head_masks = torch.stack(bpe_head_masks)#   [len([i for i in row if i !=0]) for row in bpe_head_masks ] (단어단위 not subword 단위)
+        bpe_tail_masks = torch.stack(bpe_tail_masks)#   = [len([i for i in row if i !=0]) for row in bpe_tail_masks ] 
         # 3. token_to_words : set in-batch max_word_length
         max_word_length = max(torch.sum(bpe_head_masks, dim=1)).item()# 각 DP 사례별 unmasked 사례 건수(subwords + special tokens)의 최대값
         # 3. token_to_words : placeholders
@@ -113,3 +113,13 @@ class KlueDpDataLoader(object):
             **kwargs
         )
 
+    # 원래 있던건데 학습모델 만들면서 위 함수로 변경 했다가 다시 수정
+    def get_test_dataloader(self, data_filename: str = "klue-dp-v1_test.tsv", **kwargs):
+        dataset = self.dataset.get_test_dataset(self.data_dir, data_filename)
+        return DataLoader(
+            dataset,
+            batch_size=self.args.eval_batch_size,
+            shuffle=False,
+            collate_fn=self.collate_fn,
+            **kwargs
+        )

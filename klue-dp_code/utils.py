@@ -1,13 +1,6 @@
 import numpy as np
 import torch
 
-## 20211002
-import logging
-import random
-from sklearn.metrics import f1_score, recall_score, precision_score
-
-import tarfile
-
 
 class KlueDpInputExample:
     """
@@ -63,13 +56,13 @@ class KlueDpInputFeatures:
         self, guid, ids, mask, bpe_head_mask, bpe_tail_mask, head_ids, dep_ids, pos_ids
     ):
         self.guid = guid
-        self.input_ids = ids#       len([i for i in ids if i not in [1]])
-        self.attention_mask = mask#  == torch.tensor(mask).sum() 
-        self.bpe_head_mask = bpe_head_mask# len([i for i in bpe_head_mask if i not in [0]])
-        self.bpe_tail_mask = bpe_tail_mask# == len([i for i in bpe_tail_mask if i not in [0]])
-        self.head_ids = head_ids#           == len([i for i in head_ids if i not in [-1]])
-        self.dep_ids = dep_ids#             == len([i for i in dep_ids if i not in [-1]])
-        self.pos_ids = pos_ids#             == len([i for i in pos_ids if i not in [-1]])
+        self.input_ids = ids
+        self.attention_mask = mask
+        self.bpe_head_mask = bpe_head_mask
+        self.bpe_tail_mask = bpe_tail_mask
+        self.head_ids = head_ids
+        self.dep_ids = dep_ids
+        self.pos_ids = pos_ids
 
 
 def create_examples(file_path):
@@ -213,7 +206,7 @@ def get_pos_labels():
     ]
 
 
-def flatten_prediction_and_labels(preds, labels, tokens):
+def flatten_prediction_and_labels(preds, labels):
     head_preds = list()
     head_labels = list()
     type_preds = list()
@@ -267,70 +260,24 @@ def flatten_labels(labels):
 
 
 def resize_outputs(outputs, bpe_head_mask, bpe_tail_mask, max_word_length):
-    batch_size, input_size, hidden_size = outputs.size()#torch.Size([8, 128, 1024])
+    batch_size, input_size, hidden_size = outputs.size()
     word_outputs = torch.zeros(batch_size, max_word_length + 1, hidden_size * 2).to(
         outputs.device
-    )#torch.Size([8, max_word_length, 2048])
+    )
     sent_len = list()
 
     for batch_id in range(batch_size):
-        head_ids = [i for i, token in enumerate(bpe_head_mask[batch_id]) if token == 1]# head 위치 정보: subword 기준
-        tail_ids = [i for i, token in enumerate(bpe_tail_mask[batch_id]) if token == 1]# tail 위치 정보: subword 기준
+        head_ids = [i for i, token in enumerate(bpe_head_mask[batch_id]) if token == 1]
+        tail_ids = [i for i, token in enumerate(bpe_tail_mask[batch_id]) if token == 1]
         assert len(head_ids) == len(tail_ids)
-        # outputs[batch_id].shape == torch.Size([128, 1024])
-        word_outputs[batch_id][0] = torch.cat(# outputs[batch_id][0]은 첫 token인 [CLS]에 대응
-            (outputs[batch_id][0], outputs[batch_id][0])# [torch.Size([1024]), torch.Size([1024])]
+
+        word_outputs[batch_id][0] = torch.cat(
+            (outputs[batch_id][0], outputs[batch_id][0])
         )  # replace root with [CLS]
         for i, (head, tail) in enumerate(zip(head_ids, tail_ids)):
-            word_outputs[batch_id][i + 1] = torch.cat(# concatenate the first and last subword token representations of each word, to form word vector representations.
-                (outputs[batch_id][head], outputs[batch_id][tail])# 
+            word_outputs[batch_id][i + 1] = torch.cat(
+                (outputs[batch_id][head], outputs[batch_id][tail])
             )
-        sent_len.append(i + 2)# word 기준 길이
+        sent_len.append(i + 2)
 
     return word_outputs, sent_len
-
-
-
-
-##############20211002
-from transformers import AutoTokenizer, AutoModelForMaskedLM
-
-def load_tokenizer(args):
-    # return MODEL_CLASSES[args.model_type][2].from_pretrained(args.model_name_or_path)
-    return AutoTokenizer.from_pretrained("klue/roberta-large")
-
-
-def init_logger():
-    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
-                        # level=logging.INFO)
-                        level=logging.DEBUG)
-
-
-def set_seed(args):
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    if not args.no_cuda and torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
-
-
-def compute_metrics(data):
-    scores = {}
-    for k, (preds, labels) in data.items():
-        assert len(preds) == len(labels)
-        scores.update({
-            k : {
-                "precision": precision_score(labels, preds, average='macro'),
-                "recall": recall_score(labels, preds, average='macro'),
-                "f1": f1_score(labels, preds, average='macro')
-            }            
-        })
-    return scores
-
-
-# def tardir(path, tar_name):
-#     with tarfile.open(tar_name, "w") as tar_handle:
-#         for root, dirs, files in os.walk(path):
-#             for file in files:
-#                 tar_handle.add(os.path.join(root, file))

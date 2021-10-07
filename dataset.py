@@ -197,8 +197,8 @@ class KlueDpDataset:
     # def _create_dataset(self, data_dir: str, data_filename: str, mode) -> Dataset:
     def _create_dataset(self, data_dir: str, mode) -> Dataset:
         # Load data features from cache or dataset file
-        cached_file_name = f'cached_DP_{mode}_features_{self.hparams.model_type}_{self.hparams.max_seq_length}'
 
+        cached_file_name = f'cached_DP_{mode}_features_{self.hparams.model_type}_{self.hparams.max_seq_length}'
         cached_features_file = os.path.join(data_dir, cached_file_name)
 
         

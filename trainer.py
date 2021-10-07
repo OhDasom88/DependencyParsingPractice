@@ -14,7 +14,7 @@ import utils
 import json
 import tarfile
 import torch.nn.functional as F
-
+import re
 logger = logging.getLogger(__name__)
 
 
@@ -201,7 +201,7 @@ class Trainer(object):
         # inference, 20211002
         predictions = []
         labels = []
-
+        tokens = []# 20211007
         for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
             input_ids, masks, ids, max_word_length = batch
             input_ids = input_ids.to(self.device)# ([8, 128])
@@ -219,11 +219,11 @@ class Trainer(object):
 
             # type id는 보내지 않음?
             out_arc, out_type = self.model(# ([8, max_word_length, 26]), ([8, max_word_length, 63])
-                bpe_head_mask,# ([8, 128])
-                bpe_tail_mask,# ([8, 128])
+                bpe_head_mask,# ([8, 128])  torch.sum(bpe_head_mask, dim=1)  == 서브워드 변환전 분석단위별 token의 갯수
+                bpe_tail_mask,# ([8, 128])  == torch.sum(bpe_tail_mask, dim=1) == 서브워드 변환전 분석단위별 token의 갯수
                 pos_ids,# 0,1,2 ... 44 {label: i for i, label in enumerate(get_pos_labels())},  ([8, (max_word_length+1)])
-                head_ids,# -1: padding, 0: root?, DP 대상 문자열의 처음부터 1,2,3 .., ([8, max_word_length])
-                max_word_length,# batch 별로 다름 
+                head_ids,# -1: padding, 0: root?, DP 대상 문자열의 처음부터 1,2,3 .., ([8, max_word_length])# torch.Size([10, 21]), 서브워드 변환전 분석단위 tagging 정보에 따른 정보
+                max_word_length,# batch 별로 다름 , 서브워드 변환전 분석단위별 token의 갯수
                 mask_e,# ([8, (max_word_length+1)]) 아마 encoding layer의 첫번째 입력값으로 들어가는 CLS 때문일듯
                 mask_d,# ([8, max_word_length])
                 batch_index,# ([8])
@@ -241,7 +241,7 @@ class Trainer(object):
             label = (head_ids, type_ids)# (torch.Size([8, max_word_length]), torch.Size([8, max_word_length]))
             labels.append(label)
 
-            
+            tokens.append([self.tokenizer.convert_ids_to_tokens(each_input[:heads.shape[-1]]) for each_input in input_ids.detach().cpu().numpy()])#20211007
             # loss_on_heads = torch.nn.functional.cross_entropy(out_arc.view(-1, out_arc.shape[-1]), head_ids.view(-1), ignore_index=-1)
             # loss_on_types = torch.nn.functional.cross_entropy(out_type.view(-1, out_type.shape[-1]), type_ids.view(-1), ignore_index=-1)
             # tmp_eval_loss = loss_on_heads+loss_on_types 
@@ -267,7 +267,7 @@ class Trainer(object):
 
             nb_eval_steps += 1
 
-        head_preds, type_preds, head_labels, type_labels = utils.flatten_prediction_and_labels(predictions, labels)
+        head_preds, type_preds, head_labels, type_labels = utils.flatten_prediction_and_labels(predictions, labels, tokens)
 
         eval_loss = eval_loss / nb_eval_steps
         results = {

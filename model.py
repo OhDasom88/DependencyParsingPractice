@@ -81,7 +81,7 @@ class AutoModelforKlueDp(nn.Module):
         # In our approach, we use a pretrained language model (to be fine-tuned) to extract subword representations
         inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
         outputs = self.model(**inputs)# 'roberta'
-        outputs = outputs.last_hidden_state # outputs[0]#torch.Size([8, 128, 1024]), outputs.last_hidden_state
+        outputs = outputs[0] # outputs[0]#torch.Size([8, 128, 1024]), outputs.last_hidden_state
         # resizing outputs for top encoder-decoder layers
         # concatenate the first and last subword token representations o f each word, to form word vector representations. 
         outputs, sent_len = utils.resize_outputs(##torch.Size([8, (max_word_length+1), 2048]), len(sent_len) = 8

@@ -133,6 +133,8 @@ dmypy.json
 /data
 /model
 /output
-
+klue-dp_code/data
+klue-dp_code/model
+klue-dp_code/output
 *.tar.gz
 
