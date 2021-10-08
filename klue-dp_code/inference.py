@@ -101,9 +101,9 @@ def inference(data_dir, model_dir, output_dir, args):
         for i, each_input in enumerate(input_ids.detach().cpu().numpy()):
             print(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(each_input, skip_special_tokens=True)))
             index = [i for i, label in enumerate(head_ids[i]) if label == -1]
-            print(np.delete(np.array(heads_t[i]),index))
-            print(np.delete(np.array(types_t[i]),index))
-            print([get_dp_labels()[k] for k in np.delete(np.array(types_t[i]),index)])
+            print('HEAD: ',np.delete(np.array(heads_t[i]),index))
+            print('DEPREL: ', [get_dp_labels()[k] for k in np.delete(np.array(types_t[i]),index)])
+            print('DEPREL Index: ', np.delete(np.array(types_t[i]),index))
 
 
         prediction = (heads, types)
@@ -126,15 +126,15 @@ if __name__ == "__main__":
 
     # Container environment
     parser.add_argument(
-        "--data_dir", type=str, default=os.environ.get("SM_CHANNEL_EVAL", "/home/dasomoh88/DependencyParsingPractice/klue-dp_code/data")
+        "--data_dir", type=str, default=os.environ.get("SM_CHANNEL_EVAL", "/home/tutor/DependencyParsingPractice/klue-dp_code/data")
     )
     parser.add_argument(
-        "--model_dir", type=str, default="/home/dasomoh88/DependencyParsingPractice/klue-dp_code/model"
+        "--model_dir", type=str, default="/home/tutor/DependencyParsingPractice/klue-dp_code/model"
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=os.environ.get("SM_OUTPUT_DATA_DIR", "/home/dasomoh88/DependencyParsingPractice/klue-dp_code/output"),
+        default=os.environ.get("SM_OUTPUT_DATA_DIR", "/home/tutor/DependencyParsingPractice/klue-dp_code/output"),
     )
 
     # inference arguments

@@ -44,7 +44,7 @@ class KlueDpDataset:
                                     token=token,# 공백단위로 나뉜 문자열                                       >> text.split()[...]
                                     pos= pos_info if pos_info in get_pos_labels() else 'NA',# ex)'SS+SL+NNP+SN+SS', 공백단위로 나뉜 문자열의 형태소           >> ''.join(m.pos(text.split()[...])[:,1])
                                     head=0,# ex) 2(int), 공백단위로 나뉜 문자열이 참조하는 문자열의 위치        >> 전부 0으로 주자
-                                    dep='NA',# ex) 'NP'-str, 참조하는 내용,                                 >> ''
+                                    dep='',# ex) 'NP'-str, 참조하는 내용,                                 >> ''
                                 )
                             )
 
@@ -141,11 +141,11 @@ class KlueDpDataset:
 
                     head_mask = [head] + [-1] * (bpe_len - 1)# 예측해야 하는 값
                     head_ids.extend(head_mask)
-                    dep_mask = [dep_label_map[dep]] + [-1] * (bpe_len - 1)# 각 단어당 하나
-                    # dep_mask = [-1] * (bpe_len)# 각 단어당 하나# 예측해야 하는 값
+                    # dep_mask = [dep_label_map[dep]] + [-1] * (bpe_len - 1)# 각 단어당 하나
+                    dep_mask = [-1] * (bpe_len)# 각 단어당 하나# 예측해야 하는 값
                     dep_ids.extend(dep_mask)
-                    # pos_mask = [pos_label_map[pos]] + [-1] * (bpe_len - 1)
-                    pos_mask = [len(pos_label_map)] + [-1] * (bpe_len - 1)# len(pos_label_map) == pos_padding_idx
+                    pos_mask = [pos_label_map[pos]] + [-1] * (bpe_len - 1)
+                    # pos_mask = [len(pos_label_map)] + [-1] * (bpe_len - 1)# len(pos_label_map) == pos_padding_idx
                     pos_ids.extend(pos_mask)
 
                 bpe_head_mask.append(0)
