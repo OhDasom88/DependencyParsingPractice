@@ -33,8 +33,8 @@ class KlueDpDataset:
                         sent_id += 1
                         text = parsed[1].strip()
                         guid = parsed[0].replace("##", "").strip()
-
                         for i, token in enumerate(text.split()):
+                            posinfo = [pos for char, pos in m.pos(token)][-1] if [pos for char, pos in m.pos(token)][-1] in get_pos_labels() else 'NA'
                             examples.append(
                                 KlueDpInputExample(
                                     guid=guid,# ex klue-dp-v1_dev_00001_wikitre
@@ -42,7 +42,7 @@ class KlueDpDataset:
                                     sent_id=sent_id,# 분석사례의 순서, 0번째 부터 
                                     token_id=int(i+1),# index(공백단위로 나뉜 문자열의 위치정보, 0은 root)    >> 전부 0으로 주자
                                     token=token,# 공백단위로 나뉜 문자열                                       >> text.split()[...]
-                                    pos='+'.join([pos for char, pos in m.pos(token)]),# ex)'SS+SL+NNP+SN+SS', 공백단위로 나뉜 문자열의 형태소           >> ''.join(m.pos(text.split()[...])[:,1])
+                                    pos=posinfo,# ex)'SS+SL+NNP+SN+SS', 공백단위로 나뉜 문자열의 형태소           >> ''.join(m.pos(text.split()[...])[:,1])
                                     head=0,# ex) 2(int), 공백단위로 나뉜 문자열이 참조하는 문자열의 위치        >> 전부 0으로 주자
                                     dep='',# ex) 'NP'-str, 참조하는 내용,                                 >> ''
                                 )
