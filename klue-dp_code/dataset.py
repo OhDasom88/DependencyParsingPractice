@@ -34,7 +34,7 @@ class KlueDpDataset:
                         text = parsed[1].strip()
                         guid = parsed[0].replace("##", "").strip()
                         for i, token in enumerate(text.split()):
-                            posinfo = [pos for char, pos in m.pos(token)][-1] if [pos for char, pos in m.pos(token)][-1] in get_pos_labels() else 'NA'
+                            pos_info=[pos for char, pos in m.pos(token)][-1]
                             examples.append(
                                 KlueDpInputExample(
                                     guid=guid,# ex klue-dp-v1_dev_00001_wikitre
@@ -42,19 +42,19 @@ class KlueDpDataset:
                                     sent_id=sent_id,# 분석사례의 순서, 0번째 부터 
                                     token_id=int(i+1),# index(공백단위로 나뉜 문자열의 위치정보, 0은 root)    >> 전부 0으로 주자
                                     token=token,# 공백단위로 나뉜 문자열                                       >> text.split()[...]
-                                    pos=posinfo,# ex)'SS+SL+NNP+SN+SS', 공백단위로 나뉜 문자열의 형태소           >> ''.join(m.pos(text.split()[...])[:,1])
+                                    pos= pos_info if pos_info in get_pos_labels() else 'NA',# ex)'SS+SL+NNP+SN+SS', 공백단위로 나뉜 문자열의 형태소           >> ''.join(m.pos(text.split()[...])[:,1])
                                     head=0,# ex) 2(int), 공백단위로 나뉜 문자열이 참조하는 문자열의 위치        >> 전부 0으로 주자
-                                    dep='',# ex) 'NP'-str, 참조하는 내용,                                 >> ''
+                                    dep='NA',# ex) 'NP'-str, 참조하는 내용,                                 >> ''
                                 )
                             )
 
-                # else:
-                    # token_list = []
-                    # token_list = (# sent_id, index	공백단위 split	LEMMA(형태소단위)	POS(형태소정보)	HEAD(참조 index)	DEPREL(관계정보)
-                    #     [sent_id]
-                    #     + [token.replace("\n", "") for token in line.split("\t")]
-                    #     + ["-", "-"]
-                    # )
+                else:
+                    token_list = []
+                    token_list = (# sent_id, index	공백단위 split	LEMMA(형태소단위)	POS(형태소정보)	HEAD(참조 index)	DEPREL(관계정보)
+                        [sent_id]
+                        + [token.replace("\n", "") for token in line.split("\t")]
+                        + ["-", "-"]
+                    )
                     # examples.append(
                     #     KlueDpInputExample(
                     #         guid=guid,# ex klue-dp-v1_dev_00001_wikitre
@@ -139,10 +139,10 @@ class KlueDpDataset:
                     bpe_head_mask.extend(head_token_mask)
                     bpe_tail_mask.extend(tail_token_mask)
 
-                    head_mask = [head] + [-1] * (bpe_len - 1)
+                    head_mask = [head] + [-1] * (bpe_len - 1)# 예측해야 하는 값
                     head_ids.extend(head_mask)
-                    # dep_mask = [dep_label_map[dep]] + [-1] * (bpe_len - 1)# 각 단어당 하나
-                    dep_mask = [-1] * (bpe_len)# 각 단어당 하나
+                    dep_mask = [dep_label_map[dep]] + [-1] * (bpe_len - 1)# 각 단어당 하나
+                    # dep_mask = [-1] * (bpe_len)# 각 단어당 하나# 예측해야 하는 값
                     dep_ids.extend(dep_mask)
                     # pos_mask = [pos_label_map[pos]] + [-1] * (bpe_len - 1)
                     pos_mask = [len(pos_label_map)] + [-1] * (bpe_len - 1)# len(pos_label_map) == pos_padding_idx
