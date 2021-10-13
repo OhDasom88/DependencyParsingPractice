@@ -148,7 +148,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--test_filename",
-        default="klue-dp-v1.1_test.tsv",
+        default="result-head_final.txt",
+        # default="klue-dp-v1.1_test.tsv",
         type=str,
         help="Name of the test file (default: klue-dp-v1.1_test.tsv)",
     )
